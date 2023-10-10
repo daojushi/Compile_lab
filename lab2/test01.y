@@ -1,103 +1,113 @@
 %{
-/*********************************************
-将所有的词法分析功能均放在 yylex 函数内实现，为 +、-、*、\、(、 ) 每个运算符及整数分别定义一个单词类别，在 yylex 内实现代码，能
-识别这些单词，并将单词类别返回给词法分析程序。
-实现功能更强的词法分析程序，可识别并忽略空格、制表符、回车等
-空白符，能识别多位十进制整数。
-YACC file
-**********************************************/
-#include<stdio.h>
-#include<stdlib.h>
-#include<ctype.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h> 
+#include <string.h>
+
 #ifndef YYSTYPE
 #define YYSTYPE double
 #endif
+
 int yylex();
 extern int yyparse();
-FILE* yyin;
+struct symtab* search_sym(char *s);
 void yyerror(const char* s);
+int count = 0;
+FILE* yyin;
 %}
-
-//TODO:给每个符号定义一个单词类别
-%token ADD MINUS 
-%token MUL DIV
-%token LPAREN RPAREN
+%token ADD      
+%token SUB
+%token MUL
+%token DIV
+%token LPAREN  RPAREN
 %token NUMBER
 %token UMINUS
 
-%left ADD MINUS
-%left MUL DIV
-%right UMINUS   
-
-
+%left ADD  SUB
+%left MUL  DIV
+%right UMINUS
 %%
+lines	:	lines expr ';'	{ printf("%f\n", $2);count=0; }
+		| 	lines ';'
+		|
+		;
 
-
-lines   :       lines expr ';' { printf("%f\n", $2); }
-        |       lines ';'
-        |
-        ;
-//TODO:完善表达式的规则
-expr    :       expr ADD expr   { $$=$1+$3; }
-        |       expr MINUS expr   { $$=$1-$3; }
-        |       expr MUL expr   { $$=$1*$3; }
-        |       expr DIV expr   { $$=$1/$3; }
-        |       LPAREN expr RPAREN   { $$=$2; }
-        |       MINUS expr %prec UMINUS   {$$=-$2;}
-        |       NUMBER  {$$=$1;}
-        ;
-
+expr	: 	expr ADD expr { $$ = $1 + $3; }
+		| 	expr SUB expr { $$ = $1 - $3; }
+		| 	expr MUL expr { $$ = $1 * $3; }
+		| 	expr DIV expr { $$ = $1 / $3; }
+		| 	LPAREN expr RPAREN { $$ = $2; }
+		| 	UMINUS NUMBER { $$ = -$2; }
+		| 	NUMBER { $$ = $1; }
+		;
 %%
-
-// programs section
-
 int yylex()
 {
-    int t;
-    while(1){
-        t=getchar();
-        if(t==' '||t=='\t'||t=='\n'){
-            //do noting
-        }else if(isdigit(t)){
-            //TODO:解析多位数字返回数字类型 
-            yylval = 0;
-			while (isdigit(t))
+	int ch;
+	while (1)
+	{
+		ch = getchar();
+		if(ch==' ' || ch=='\t'||ch=='\n')
+		    ;
+		else if (isdigit(ch))
+		{
+			yylval = 0;
+			while (isdigit(ch))
 			{
-				yylval = yylval * 10 + t- '0';
-				t=getchar();
+				yylval = yylval * 10 + ch - '0';
+				ch = getchar();
 			}
-			ungetc(t, stdin);//将多读的一个字符放回去:比如'+'
+			ungetc(ch, stdin);
+            		count = 1;
 			return NUMBER;
-        }else if(t=='+'){
-            return ADD;
-        }else if(t=='-'){
-            return MINUS;
-        }//TODO:识别其他符号
-        else if(t=='*'){
-            return MUL;
-        }else if(t=='/'){
-            return DIV;
-        }else if(t=='('){
-            return LPAREN;
-        }else if(t==')'){
-            return RPAREN;
-        }
-        else{
-            return t;
-        }
-    }
+		}
+		else
+		{	
+			
+			if(ch=='-'){
+			    if(count==0)
+			    {
+			    	return UMINUS;
+			    }
+			    else
+			    {
+			    	count = 0;
+			    	return SUB;
+			    }
+			}
+			else if (ch == '+')
+			{
+            			count = 0;
+				return ADD;
+			} 
+			else if (ch == '*') 
+			{
+            			count = 0;
+				return MUL;
+			} 
+			else if (ch == '/') 
+			{
+            			count = 0;
+				return DIV;
+			} 
+			else if (ch == '(') 
+				return LPAREN;
+			else if (ch == ')') 
+				return RPAREN;
+			else 
+				return ch;
+		}
+	}
 }
-
-int main(void)
+int main()
 {
-    yyin=stdin;
-    do{
-        yyparse();
-    }while(!feof(yyin));
-    return 0;
+	yyin = stdin;
+	do {
+		yyparse();
+	} while (!feof(yyin));
+	return 0;
 }
-void yyerror(const char* s){
-    fprintf(stderr,"Parse error: %s\n",s);
-    exit(1);
+void yyerror(const char* s) {
+	fprintf(stderr, "error: %s\n", s);
+	exit(1);
 }
-
